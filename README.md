@@ -69,7 +69,7 @@ agent-engineering/
 │
 └── 🎓 training/
     └── scenarios/            ← Red team exercises
-
+```
 ---
 
 ## ⚔️ Attack Taxonomy (Preview)
