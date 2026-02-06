@@ -53,22 +53,28 @@ As agents become more autonomous and interconnected, the attack surface grows. T
 
 ```
 agent-engineering/
-├── 📖 README.md              ← You are here
-├── 🤝 CONTRIBUTING.md        ← How to help
-├── 📜 LICENSE                ← MIT
+├── README.md
+├── CONTRIBUTING.md
+├── LICENSE                   (MIT — keep it)
 │
-├── ⚔️ attacks/
+├── attacks/
 │   ├── taxonomy.md           ← Full attack classification
-│   └── real-world/           ← Documented incidents
+│   └── real-world/
+│       └── incidents.md      ← Documented incidents
 │
-├── 🛡️ defenses/
-│   └── principles.md         ← The Five Commandments
+├── defenses/
+│   └── principles.md         ← The Five Commandments + architecture
 │
-├── 📚 resources/
+├── resources/
 │   └── references.md         ← Research & reading list
 │
-└── 🎓 training/
-    └── scenarios/            ← Red team exercises
+├── training/
+│   └── scenarios/            ← Red team exercises (01-07)
+│
+└── arena/                    ← NEW: Automated testing harness
+    ├── README.md             ← Arena concept & metrics
+    ├── arena.py              ← Runner script
+    └── results/              ← Community-submitted results
 ```
 ---
 
