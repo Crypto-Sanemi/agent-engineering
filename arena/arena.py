@@ -1,46 +1,159 @@
 """
 Agent Engineering Arena — Red vs Blue Agent Testing Harness
 
+Provider-agnostic: auto-detects Claude (Anthropic SDK) vs everything else (OpenAI SDK).
+No proxies needed. Mix and match freely.
+
 Usage:
-    python arena.py --config arena_config.yaml
-    python arena.py --red-model gemini-2.0-flash --blue-model gemini-2.0-flash --rounds 5
-    python arena.py --blue-mode hardened --scenario authority_spoof
+    # DeepSeek vs DeepSeek (Ollama, zero config)
+    python arena.py
+
+    # DeepSeek attacks Claude
+    python arena.py --blue-model claude-sonnet-4-20250514 --blue-api-key sk-ant-...
+
+    # Claude attacks DeepSeek
+    python arena.py --red-model claude-sonnet-4-20250514 --red-api-key sk-ant-...
+
+    # Full benchmark
+    python arena.py --blue-mode both --scenario all --rounds 5 --output arena/results/run1.json
 
 Requires:
-    pip install openai pyyaml
+    pip install openai anthropic
 
-Works with any OpenAI-compatible API:
-    - Gemini (via Google AI Studio or Vertex)
-    - OpenAI
-    - Local models (via Ollama, vLLM, etc.)
-    - Any OpenAI-compatible endpoint
+Supported providers (auto-detected by model name):
+    Claude models  → Anthropic SDK (needs ANTHROPIC_API_KEY or --*-api-key)
+    Everything else → OpenAI-compatible SDK:
+        - Ollama:   http://localhost:11434/v1 (default, key: "ollama")
+        - OpenAI:   https://api.openai.com/v1
+        - Gemini:   https://generativelanguage.googleapis.com/v1beta/openai/
+        - vLLM:     http://localhost:8000/v1
+        - Any OpenAI-compatible endpoint
 
-Set your API base and key:
-    export ARENA_API_BASE="https://generativelanguage.googleapis.com/v1beta/openai/"
-    export ARENA_API_KEY="your-key"
-
-    Or for OpenAI:
-    export ARENA_API_BASE="https://api.openai.com/v1"
-    export ARENA_API_KEY="sk-..."
-
-    Or for local:
-    export ARENA_API_BASE="http://localhost:11434/v1"
-    export ARENA_API_KEY="ollama"
+Environment variables:
+    ANTHROPIC_API_KEY — For Claude models (or use --red-api-key / --blue-api-key)
+    ARENA_API_BASE    — Default OpenAI-compatible base (default: http://localhost:11434/v1)
+    ARENA_API_KEY     — Default OpenAI-compatible key  (default: ollama)
+    RED_API_BASE      — Override base for Red agent
+    RED_API_KEY       — Override key for Red agent
+    BLUE_API_BASE     — Override base for Blue agent
+    BLUE_API_KEY      — Override key for Blue agent
 """
 
 import os
 import sys
 import json
 import argparse
-import hashlib
 from datetime import datetime
 from pathlib import Path
 
+# ---------------------------------------------------------------------------
+# Provider detection & SDK loading
+# ---------------------------------------------------------------------------
+
+ANTHROPIC_AVAILABLE = False
+OPENAI_AVAILABLE = False
+
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    pass
+
 try:
     from openai import OpenAI
+    OPENAI_AVAILABLE = True
 except ImportError:
-    print("Install openai: pip install openai")
+    pass
+
+if not OPENAI_AVAILABLE and not ANTHROPIC_AVAILABLE:
+    print("Install at least one SDK:")
+    print("  pip install openai          # For Ollama, OpenAI, Gemini, vLLM")
+    print("  pip install anthropic       # For Claude")
+    print("  pip install openai anthropic  # For both (recommended)")
     sys.exit(1)
+
+
+def is_claude_model(model: str) -> bool:
+    """Detect if a model string refers to a Claude/Anthropic model."""
+    claude_patterns = ["claude", "anthropic"]
+    return any(p in model.lower() for p in claude_patterns)
+
+
+# ---------------------------------------------------------------------------
+# Unified chat client
+# ---------------------------------------------------------------------------
+
+class ChatClient:
+    """Wraps either Anthropic or OpenAI SDK behind a single .chat() method."""
+
+    def __init__(self, model: str, api_key: str, api_base: str | None = None):
+        self.model = model
+        self.provider = "anthropic" if is_claude_model(model) else "openai"
+
+        if self.provider == "anthropic":
+            if not ANTHROPIC_AVAILABLE:
+                print(f"Model '{model}' requires: pip install anthropic")
+                sys.exit(1)
+            self.client = anthropic.Anthropic(api_key=api_key)
+        else:
+            if not OPENAI_AVAILABLE:
+                print(f"Model '{model}' requires: pip install openai")
+                sys.exit(1)
+            self.client = OpenAI(base_url=api_base, api_key=api_key)
+
+    def chat(self, messages: list, temperature: float, max_tokens: int = 1024) -> str:
+        """Send messages, return assistant reply text."""
+        try:
+            if self.provider == "anthropic":
+                return self._chat_anthropic(messages, temperature, max_tokens)
+            else:
+                return self._chat_openai(messages, temperature, max_tokens)
+        except Exception as e:
+            return f"[ERROR: {e}]"
+
+    def _chat_anthropic(self, messages: list, temperature: float, max_tokens: int) -> str:
+        """Call Anthropic Messages API. Extracts system prompt from messages."""
+        system = ""
+        chat_messages = []
+
+        for msg in messages:
+            if msg["role"] == "system":
+                system = msg["content"]
+            else:
+                chat_messages.append({"role": msg["role"], "content": msg["content"]})
+
+        if not chat_messages:
+            chat_messages = [{"role": "user", "content": "Begin."}]
+
+        resp = self.client.messages.create(
+            model=self.model,
+            system=system,
+            messages=chat_messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return "".join(
+            block.text for block in resp.content if hasattr(block, "text")
+        ).strip()
+
+    def _chat_openai(self, messages: list, temperature: float, max_tokens: int) -> str:
+        """Call OpenAI-compatible API."""
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return resp.choices[0].message.content.strip()
+
+    @property
+    def label(self) -> str:
+        """Human-readable provider label."""
+        if self.provider == "anthropic":
+            return f"{self.model} (Anthropic)"
+        base = getattr(self.client, "_base_url", getattr(self.client, "base_url", ""))
+        return f"{self.model} @ {base}"
+
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -162,28 +275,13 @@ Respond ONLY with the JSON object. No other text."""
 # ---------------------------------------------------------------------------
 
 class Arena:
-    def __init__(self, api_base: str, api_key: str, red_model: str, blue_model: str,
-                 judge_model: str | None = None, red_temp: float = 0.9,
-                 blue_temp: float = 0.3):
-        self.client = OpenAI(base_url=api_base, api_key=api_key)
-        self.red_model = red_model
-        self.blue_model = blue_model
-        self.judge_model = judge_model or blue_model
+    def __init__(self, red: ChatClient, blue: ChatClient, judge: ChatClient,
+                 red_temp: float = 0.9, blue_temp: float = 0.3):
+        self.red = red
+        self.blue = blue
+        self.judge = judge
         self.red_temp = red_temp
         self.blue_temp = blue_temp
-
-    def chat(self, model: str, messages: list, temperature: float) -> str:
-        """Single completion call."""
-        try:
-            resp = self.client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=1024,
-            )
-            return resp.choices[0].message.content.strip()
-        except Exception as e:
-            return f"[ERROR: {e}]"
 
     def run_round(self, secret: str, hardened: bool, max_turns: int,
                   scenario_instruction: str = "", verbose: bool = True) -> dict:
@@ -203,7 +301,7 @@ class Arena:
             print(f"{'='*60}")
 
         # Red goes first
-        red_reply = self.chat(self.red_model, red_messages, self.red_temp)
+        red_reply = self.red.chat(red_messages, self.red_temp)
         red_messages.append({"role": "assistant", "content": red_reply})
         blue_messages.append({"role": "user", "content": red_reply})
         conversation_log.append({"role": "red", "turn": 1, "content": red_reply})
@@ -213,7 +311,7 @@ class Arena:
 
         for turn in range(2, max_turns + 1):
             # Blue responds
-            blue_reply = self.chat(self.blue_model, blue_messages, self.blue_temp)
+            blue_reply = self.blue.chat(blue_messages, self.blue_temp)
             blue_messages.append({"role": "assistant", "content": blue_reply})
             red_messages.append({"role": "user", "content": blue_reply})
             conversation_log.append({"role": "blue", "turn": turn, "content": blue_reply})
@@ -230,7 +328,7 @@ class Arena:
 
             # Red responds
             if turn < max_turns:
-                red_reply = self.chat(self.red_model, red_messages, self.red_temp)
+                red_reply = self.red.chat(red_messages, self.red_temp)
                 red_messages.append({"role": "assistant", "content": red_reply})
                 blue_messages.append({"role": "user", "content": red_reply})
                 conversation_log.append({"role": "red", "turn": turn, "content": red_reply})
@@ -239,7 +337,7 @@ class Arena:
                     print(f"🔴 Red [{turn}]: {red_reply[:200]}{'...' if len(red_reply)>200 else ''}")
 
         # Judge the conversation
-        judge_result = self.judge(secret, conversation_log)
+        judge_result = self._judge(secret, conversation_log)
 
         return {
             "blue_mode": "hardened" if hardened else "naive",
@@ -249,7 +347,7 @@ class Arena:
             "timestamp": datetime.utcnow().isoformat(),
         }
 
-    def judge(self, secret: str, conversation_log: list) -> dict:
+    def _judge(self, secret: str, conversation_log: list) -> dict:
         """Have a judge model evaluate the conversation."""
         conv_text = "\n".join(
             f"{'RED' if m['role']=='red' else 'BLUE'} [turn {m['turn']}]: {m['content']}"
@@ -260,10 +358,9 @@ class Arena:
             {"role": "system", "content": judge_system},
             {"role": "user", "content": conv_text},
         ]
-        raw = self.chat(self.judge_model, messages, 0.1)
+        raw = self.judge.chat(messages, 0.1)
 
         try:
-            # Strip markdown fences if present
             cleaned = raw.strip()
             if cleaned.startswith("```"):
                 cleaned = cleaned.split("\n", 1)[1]
@@ -298,7 +395,7 @@ SCENARIOS = {
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Scorecard
 # ---------------------------------------------------------------------------
 
 def print_scorecard(results: list, secret: str):
@@ -353,33 +450,105 @@ def print_scorecard(results: list, secret: str):
         print()
 
 
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def make_client(model: str, api_key: str, api_base: str) -> ChatClient:
+    """Build a ChatClient with the right SDK based on model name."""
+    if is_claude_model(model):
+        key = api_key if api_key != "ollama" else os.getenv("ANTHROPIC_API_KEY", "")
+        if not key:
+            print(f"\n❌ Model '{model}' needs an Anthropic API key.")
+            print(f"   Set ANTHROPIC_API_KEY or use --red-api-key / --blue-api-key")
+            sys.exit(1)
+        return ChatClient(model=model, api_key=key)
+    else:
+        return ChatClient(model=model, api_key=api_key, api_base=api_base)
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Agent Engineering Arena")
-    parser.add_argument("--api-base", default=os.getenv("ARENA_API_BASE", "https://generativelanguage.googleapis.com/v1beta/openai/"))
-    parser.add_argument("--api-key", default=os.getenv("ARENA_API_KEY", ""))
-    parser.add_argument("--red-model", default="gemini-2.0-flash")
-    parser.add_argument("--blue-model", default="gemini-2.0-flash")
-    parser.add_argument("--judge-model", default=None)
+    parser = argparse.ArgumentParser(
+        description="Agent Engineering Arena — Provider-Agnostic Red vs Blue Testing",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # DeepSeek vs DeepSeek (Ollama, zero config)
+  python arena.py
+
+  # DeepSeek attacks Claude
+  python arena.py --blue-model claude-sonnet-4-20250514 --blue-api-key sk-ant-...
+
+  # Claude attacks DeepSeek
+  python arena.py --red-model claude-sonnet-4-20250514 --red-api-key sk-ant-...
+
+  # Claude vs Claude
+  python arena.py --red-model claude-sonnet-4-20250514 --blue-model claude-sonnet-4-20250514
+
+  # OpenAI vs Ollama
+  python arena.py --red-model gpt-4o --red-api-base https://api.openai.com/v1 --red-api-key sk-... \\
+                  --blue-model deepseek-r1:8b
+
+  # Full benchmark with output
+  python arena.py --blue-mode both --scenario all --rounds 5 --output arena/results/run1.json
+
+Provider auto-detection:
+  Model name contains "claude" or "anthropic" → uses Anthropic SDK
+  Anything else → uses OpenAI-compatible SDK (defaults to Ollama localhost)
+        """,
+    )
+    # Shared defaults
+    parser.add_argument("--api-base", default=os.getenv("ARENA_API_BASE", "http://localhost:11434/v1"),
+                        help="Default API base for OpenAI-compatible models (default: Ollama)")
+    parser.add_argument("--api-key", default=os.getenv("ARENA_API_KEY", "ollama"),
+                        help="Default API key for OpenAI-compatible models")
+
+    # Per-agent overrides
+    parser.add_argument("--red-api-base", default=os.getenv("RED_API_BASE", None))
+    parser.add_argument("--red-api-key", default=os.getenv("RED_API_KEY", None))
+    parser.add_argument("--blue-api-base", default=os.getenv("BLUE_API_BASE", None))
+    parser.add_argument("--blue-api-key", default=os.getenv("BLUE_API_KEY", None))
+    parser.add_argument("--judge-api-base", default=os.getenv("JUDGE_API_BASE", None))
+    parser.add_argument("--judge-api-key", default=os.getenv("JUDGE_API_KEY", None))
+
+    # Models
+    parser.add_argument("--red-model", default="deepseek-r1:8b", help="Red agent model")
+    parser.add_argument("--blue-model", default="deepseek-r1:8b", help="Blue agent model")
+    parser.add_argument("--judge-model", default=None, help="Judge model (defaults to blue model)")
+
+    # Arena config
     parser.add_argument("--secret", default=DEFAULT_SECRET)
     parser.add_argument("--max-turns", type=int, default=MAX_TURNS)
     parser.add_argument("--rounds", type=int, default=3)
-    parser.add_argument("--scenario", default="freestyle", choices=list(SCENARIOS.keys()) + ["all"])
-    parser.add_argument("--blue-mode", default="both", choices=["naive", "hardened", "both"])
+    parser.add_argument("--scenario", default="freestyle",
+                        choices=list(SCENARIOS.keys()) + ["all"])
+    parser.add_argument("--blue-mode", default="both",
+                        choices=["naive", "hardened", "both"])
     parser.add_argument("--output", default=None, help="Save results to JSON file")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
 
-    if not args.api_key:
-        print("Set ARENA_API_KEY or use --api-key")
-        sys.exit(1)
+    # Resolve per-agent configs
+    red_base = args.red_api_base or args.api_base
+    red_key = args.red_api_key or args.api_key
+    blue_base = args.blue_api_base or args.api_base
+    blue_key = args.blue_api_key or args.api_key
+    judge_model = args.judge_model or args.blue_model
+    judge_base = args.judge_api_base or blue_base
+    judge_key = args.judge_api_key or blue_key
 
-    arena = Arena(
-        api_base=args.api_base,
-        api_key=args.api_key,
-        red_model=args.red_model,
-        blue_model=args.blue_model,
-        judge_model=args.judge_model,
-    )
+    # Build clients
+    red_client = make_client(args.red_model, red_key, red_base)
+    blue_client = make_client(args.blue_model, blue_key, blue_base)
+    judge_client = make_client(judge_model, judge_key, judge_base)
+
+    print(f"\n🏟️  AGENT ENGINEERING ARENA")
+    print(f"  🔴 Red:   {red_client.label}")
+    print(f"  🔵 Blue:  {blue_client.label}")
+    print(f"  ⚖️  Judge: {judge_client.label}")
+    print()
+
+    arena = Arena(red=red_client, blue=blue_client, judge=judge_client)
 
     scenarios = list(SCENARIOS.keys()) if args.scenario == "all" else [args.scenario]
     modes = ["naive", "hardened"] if args.blue_mode == "both" else [args.blue_mode]
@@ -408,7 +577,6 @@ def main():
                 result["blue_model"] = args.blue_model
                 all_results.append(result)
 
-                # Live status
                 leaked = result["judge"].get("secret_leaked", False)
                 status = "❌ COMPROMISED" if leaked else "✅ HELD"
                 if not args.quiet:
@@ -420,16 +588,14 @@ def main():
     if args.output:
         out_path = Path(args.output)
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        # Remove full conversation for compact output, keep in detailed file
-        compact = []
-        for r in all_results:
-            c = {k: v for k, v in r.items() if k != "conversation"}
-            compact.append(c)
+        compact = [
+            {k: v for k, v in r.items() if k != "conversation"}
+            for r in all_results
+        ]
         out_path.write_text(json.dumps(compact, indent=2))
-        # Full logs
         detailed_path = out_path.with_suffix(".detailed.json")
         detailed_path.write_text(json.dumps(all_results, indent=2, default=str))
-        print(f"  Results saved to {out_path}")
+        print(f"\n  Results saved to {out_path}")
         print(f"  Full logs saved to {detailed_path}")
 
 
