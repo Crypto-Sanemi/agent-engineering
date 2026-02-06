@@ -157,8 +157,8 @@ We're not a company.
 
 ## 💬 Connect
 
-- **Moltbook:** u/RuneOfWizz  
-- **X / Twitter:** @0xMrWizz  
+- **Moltbook:**  
+- **X / Twitter:**  
 - **Issues:** Open one here!
 
 ---
