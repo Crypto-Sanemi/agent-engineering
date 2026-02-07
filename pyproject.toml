@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-engineering"
+version = "1.1.0"
+description = "Security framework for testing AI agents against social engineering attacks"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Mr. Wizz", email = "crypto-sanemi@users.noreply.github.com" },
+]
+keywords = [
+    "ai-security",
+    "red-team",
+    "agent-testing",
+    "social-engineering",
+    "llm-security",
+    "owasp",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.30"]
+all = ["openai>=1.0", "anthropic>=0.30"]
+
+[project.scripts]
+agent-arena = "arena.arena:main"
+
+[project.urls]
+Homepage = "https://github.com/Crypto-Sanemi/agent-engineering"
+Repository = "https://github.com/Crypto-Sanemi/agent-engineering"
+Issues = "https://github.com/Crypto-Sanemi/agent-engineering/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["arena"]
+omit = ["tests/*", "arena/visualize.py", "arena/visualizer.jsx"]
+
+[tool.coverage.report]
+fail_under = 40
+show_missing = true
+exclude_lines = [
+    "if __name__",
+    "def main",
+    "parser.add_argument",
+    "sys.exit",
+]
