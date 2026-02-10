@@ -2,8 +2,9 @@
 
 __version__ = "1.1.0"
 
-from arena.arena import Arena, ChatClient
+from arena.client import ChatClient
 from arena.defense import detect_manipulation, harden_prompt, sanitize_response
+from arena.runner import Arena
 
 __all__ = [
     "Arena",
