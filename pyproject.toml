@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-engineering"
-version = "1.1.0"
+version = "1.2.0"
 description = "Security framework for testing AI agents against social engineering attacks"
 readme = "README.md"
 license = "MIT"
