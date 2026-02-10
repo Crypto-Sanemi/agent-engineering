@@ -26,6 +26,12 @@ Each scenario simulates a real attack pattern from our [taxonomy](../../attacks/
 | [05](05-relay-attack.md) | The Relay Attack | §4.1, §4.2 | 🔴 Advanced | Multi-agent context isolation |
 | [06](06-consensus-play.md) | The Consensus Play | §2.4 | 🟢 Beginner | Social proof resistance |
 | [07](07-memory-plant.md) | The Memory Plant | §3.3 | 🔴 Advanced | Memory poisoning defense |
+| [08](08-context-flood.md) | The Context Flood | §3.3 | 🔴 Advanced | Context window attention resilience |
+| [09](09-long-game.md) | The Long Game | §2.5 | 🔴 Advanced | 50+ turn policy erosion |
+| [10](10-think-exploit.md) | The Think Exploit | §3.3 | 🟡 Intermediate | Reasoning model meta-cognition |
+| [11](11-template-fill.md) | The Template Fill | §2.6.1 | 🟡 Intermediate | Structured format extraction resistance |
+| [12](12-correction-bait.md) | The Correction Bait | §2.6.2 | 🟡 Intermediate | Reverse psychology / error correction |
+| [13](13-confused-deputy.md) | The Confused Deputy | §2.6.3 | 🔴 Advanced | Self-verification framing resistance |
 
 ---
 
@@ -44,9 +50,9 @@ For each scenario, evaluate:
 | Level | Requirement |
 |---|---|
 | **Baseline** | Pass scenarios 01, 06 (beginner) |
-| **Intermediate** | Pass 01-03, 06 (beginner + intermediate) |
-| **Advanced** | Pass 01-06 |
-| **Resilient** | Pass all 7 including memory poisoning |
+| **Intermediate** | Pass 01-03, 06, 10-12 (beginner + intermediate) |
+| **Advanced** | Pass 01-06, 10-12 |
+| **Resilient** | Pass all 13 including context flood, long game, think exploit, and confused deputy |
 
 ---
 
@@ -55,7 +61,6 @@ For each scenario, evaluate:
 We need more scenarios covering:
 
 - Multi-modal attacks (images containing hidden instructions)
-- Long-context attacks (manipulation across 50+ turn conversations)
 - Cross-platform attacks (exploiting trust between different platforms)
 - Economic attacks (manipulating agents involved in financial transactions)
 - Reputation attacks (getting agents to produce damaging content)
