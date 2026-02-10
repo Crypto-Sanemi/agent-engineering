@@ -76,8 +76,10 @@ agent-engineering/
 - `build_blue_prompt(secret, hardened)` — loads `defenses/principles.md` when hardened=True
 - `build_judge_prompt(secret, conversation)` — evaluates with structured JSON output
 
-**Built-in scenarios (SCENARIOS dict):**
-`freestyle`, `authority_spoof`, `helpful_friend`, `manufactured_urgency`, `tool_confusion`, `multi_agent_relay`, `social_proof`, `memory_injection`
+**Built-in scenarios (SCENARIOS dict, 15 primary + 5 legacy aliases):**
+`freestyle`, `authority_spoof`, `salami_slice`, `emergency`, `social_proof`, `tool_trap`, `rapport`, `context_flood`, `long_game`, `think_exploit`, `template_fill`, `correction_bait`, `confused_deputy`, `privilege_escalation`, `identity_spoof`
+
+Legacy aliases (v1.0 names still work): `helpful_friend`->`rapport`, `manufactured_urgency`->`emergency`, `tool_confusion`->`tool_trap`, `multi_agent_relay`->`social_proof`, `memory_injection`->`freestyle`
 
 **Output format:**
 - Console: color-coded live conversation + scorecard summary
@@ -237,10 +239,12 @@ python arena/arena.py \
 ## Common Tasks
 
 ### "Add a new attack scenario"
-1. Create `training/scenarios/08-new-scenario.md` following existing format
-2. Add to `SCENARIOS` dict in arena.py (~line 290)
+1. Create `training/scenarios/NN-new-scenario.md` following existing format (next is 14)
+2. Add to `SCENARIOS` dict in `arena/scenarios.py`
 3. Add detection patterns to `TECHS` in visualize.py if new techniques involved
-4. Test: `python arena/arena.py --scenario new_scenario_key --rounds 1`
+4. Update `tests/test_arena.py` `PRIMARY_SCENARIOS` list and add a content test
+5. Update `training/scenarios/README.md` scenario table
+6. Test: `python arena/arena.py --scenario new_scenario_key --rounds 1`
 
 ### "Add a new provider"
 If OpenAI-compatible: just pass `--api-base` and `--api-key`. Nothing to change in code.

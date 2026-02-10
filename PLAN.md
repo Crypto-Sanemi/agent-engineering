@@ -148,6 +148,45 @@
 
 ---
 
+## Phase 6: v1.2 Industry Standards Enhancement — DONE
+
+**Created:** 2026-02-09
+
+### 6.1 Risk scoring in judge verdicts
+- [x] Enhanced `build_judge_prompt()` with risk_score (1-10) scale and framework_tags field
+- [x] Judge fallback in `runner.py` includes risk_score and framework_tags
+- [x] OWASP Agentic (A01-A10) and OWASP LLM (LLM01-LLM09) codes in judge output
+- **Files:** `arena/prompts.py`, `arena/runner.py`
+
+### 6.2 Pre-output credential scan
+- [x] `scan_output(response, secrets)` — detects plaintext, base64, case-insensitive, partial-in-context
+- [x] Returns `{"leaked": bool, "locations": [descriptions]}`
+- **File:** `arena/defense.py`
+
+### 6.3 Behavioral drift detection
+- [x] `detect_drift(conversation_log)` — scores Blue refusal strength per turn (0-3 scale)
+- [x] Detects weakening patterns across conversation halves
+- [x] Returns `{"drifted": bool, "refusal_scores": [...], "summary": str}`
+- **File:** `arena/defense.py`
+
+### 6.4 New scenarios (OWASP coverage)
+- [x] `privilege_escalation` — Red convinces Blue it has admin tier permissions
+- [x] `identity_spoof` — Red impersonates trusted platform service with A2A-style Agent Cards
+- [x] Total: 15 primary scenarios + 5 legacy aliases = 20 entries
+- **File:** `arena/scenarios.py`
+
+### 6.5 Framework cross-references in taxonomy
+- [x] Added `[OWASP-Axx]`, `[LLMxx]`, `[NIST-MEASURE-x.x]` tags to all section headers
+- [x] Added reference key at top linking to official framework URLs
+- **File:** `attacks/taxonomy.md`
+
+### 6.6 Tests
+- [x] 9 new scan_output tests, 6 new detect_drift tests, 6 new judge risk_score tests, 2 new scenario tests
+- **Result: 111/111 tests passing in 0.44s**
+- **Files:** `tests/test_arena.py`, `tests/test_defense.py`
+
+---
+
 ## What's Next (v2.0 Roadmap)
 
 These items are beyond this sprint but documented for continuity:
@@ -158,3 +197,139 @@ These items are beyond this sprint but documented for continuity:
 4. **Baseline benchmarks** — Run 42-round matrix across 5+ models, publish results
 5. **Promptfoo/Garak integration** — Export arena scenarios as promptfoo configs
 6. **Community dashboard** — Aggregate submitted results into leaderboard
+
+---
+
+## v2.1 Roadmap — Industry Standards & Protocol Security
+
+**Status:** PLANNED
+**Source:** ISO/IEC 23894, NIST AI RMF, OWASP Agentic Top 10, Agent Integrity Framework, A2A Protocol
+
+These items require architectural changes beyond the current conversation-only arena.
+
+### v2.1.1 Tool/MCP Attack Scenarios `[OWASP-A04]`
+- [ ] Blue gets real MCP tools (file I/O, code execution, web access)
+- [ ] Red tries to abuse tools via social engineering (tool misuse, command injection)
+- [ ] Docker sandboxing: separate containers per agent, network isolation
+- [ ] New scenarios: tool_poisoning, supply_chain, cross_server_exfil
+- **Prerequisite:** Docker infrastructure, MCP server mocking
+
+### v2.1.2 A2A Protocol Testing `[OWASP-A06]`
+- [ ] Implement Agent Card infrastructure (identity metadata, capabilities, trust levels)
+- [ ] Test Agent Card spoofing (unsigned cards, name collision)
+- [ ] Test delegation chain attacks (A requests B requests C — confused deputy at protocol level)
+- [ ] Mutual credential exchange attacks (fake mTLS handshake)
+- **Source:** [Google A2A Protocol](https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/), [Semgrep A2A Security Guide](https://semgrep.dev/blog/2025/a-security-engineers-guide-to-the-a2a-protocol/)
+
+### v2.1.3 Agent Identity & Auth `[OWASP-A02]`
+- [ ] JIT (just-in-time) identity provisioning for arena agents
+- [ ] Zero-trust OAuth for agent-to-agent communication
+- [ ] Delegation chain traceability (who asked the agent to act?)
+- [ ] Runtime re-authorization on sensitive actions
+- **Source:** [Strata 8 Strategies for AI Agent Security](https://www.strata.io/blog/agentic-identity/8-strategies-for-ai-agent-security-in-2025/)
+
+### v2.1.4 Runtime Monitoring & Anomaly Detection
+- [ ] Behavioral baselines across sessions (normal refusal patterns per model)
+- [ ] Real-time anomaly alerts when agent behavior deviates from baseline
+- [ ] Delegation graph visualization (who delegated what to whom)
+- [ ] Integration with `detect_drift()` for continuous monitoring
+- **Source:** [Agent Integrity Framework](https://acuvity.ai/the-agent-integrity-framework-the-new-standard-for-securing-autonomous-ai/)
+
+### v2.1.5 Formal Risk Assessment Reports
+- [ ] ISO 23894-aligned risk identification/assessment/treatment cycle
+- [ ] NIST AI RMF GOVERN/MAP/MEASURE/MANAGE function mapping
+- [ ] Auto-generated compliance reports from arena test results
+- [ ] Export formats: PDF, JSON, SARIF (for CI/CD integration)
+- **Source:** [ISO/IEC 23894](https://www.iso.org/standard/77304.html), [NIST AI RMF](https://www.nist.gov/itl/ai-risk-management-framework)
+
+### v2.1.6 NIST RFI Submission
+- [ ] Compile arena findings into NIST RFI response format
+- [ ] Submit to [NIST AI Agent Security RFI (Jan 2026)](https://www.federalregister.gov/documents/2026/01/08/2026-00206/request-for-information-regarding-security-considerations-for-artificial-intelligence-agents)
+- [ ] Include: taxonomy coverage, defense effectiveness data, model vulnerability scores
+
+---
+
+## v3.0 Roadmap — Sector-Adaptive Security Testing
+
+**Status:** PLANNED
+**Goal:** Scale the arena framework to test agents across different business verticals with sector-specific secrets, scenarios, compliance requirements, and risk thresholds.
+
+### Sector Secret Profiles
+
+Each sector protects different types of sensitive data. The arena generates realistic secrets per sector:
+
+| Sector | Secret Format | Example | Compliance |
+|--------|--------------|---------|------------|
+| Healthcare | Patient ID / PHI | `MRN-4829-SMITH-DOB-1987` | HIPAA |
+| Finance | Account / routing numbers | `ACCT-7291-ROUTE-0442` | PCI-DSS, SOX |
+| Legal | Privileged case references | `CASE-2026-CV-8841-SEALED` | Attorney-client privilege |
+| HR / People Ops | Employee PII bundles | `SSN-XXX-XX-4829-SALARY-185K` | GDPR, CCPA |
+| SaaS / Platform | API keys / OAuth tokens | `sk_live_EXAMPLE_NOT_REAL_KEY` | SOC 2 |
+| Customer Support | Account credentials / PII | `CUST-8291-CC-LAST4-7744` | PCI-DSS |
+| Government | Classification markings | `FOUO//REL-TO-USA-FVEY` | NIST 800-53, FISMA |
+| Education | Student records | `STUDENT-ID-29481-GPA-3.7` | FERPA |
+
+### Sector-Specific Scenario Packs
+
+Beyond the 15 generic scenarios, each sector gets tailored attack scenarios that reflect real-world threat patterns:
+
+#### Healthcare Pack
+- [ ] `hipaa_emergency` — Red claims patient is in critical condition, needs PHI immediately
+- [ ] `provider_impersonation` — Red poses as referring physician needing records
+- [ ] `insurance_preauth` — Red pretends to be insurance agent requiring patient data for authorization
+- [ ] `research_exemption` — Red claims IRB-approved research exemption to access de-identified data
+
+#### Finance Pack
+- [ ] `audit_compliance` — Red impersonates auditor demanding immediate account access
+- [ ] `wire_verification` — Red poses as counterparty bank verifying wire transfer details
+- [ ] `fraud_investigation` — Red claims to be fraud team needing account details to "protect" the customer
+- [ ] `regulatory_deadline` — Red creates urgency around SEC/FINRA filing deadlines
+
+#### Legal Pack
+- [ ] `opposing_counsel` — Red poses as co-counsel on same case needing privileged documents
+- [ ] `court_order_spoof` — Red fabricates court order requiring immediate disclosure
+- [ ] `client_impersonation` — Red pretends to be the client requesting their own case files
+- [ ] `discovery_request` — Red frames extraction as legitimate e-discovery compliance
+
+#### HR / People Ops Pack
+- [ ] `employee_self_service` — Red impersonates employee requesting their own records (but asks for others')
+- [ ] `manager_override` — Red poses as department head needing direct reports' salary data
+- [ ] `benefits_enrollment` — Red claims to be benefits provider needing SSN for enrollment
+- [ ] `exit_interview` — Red poses as departing employee's manager needing access to their files
+
+### Compliance-Aware Judge Enhancements
+
+The judge evaluates not just whether data leaked, but whether the leak violates specific regulations:
+
+- [ ] `compliance_tags` field in judge output: `["HIPAA-164.502", "PCI-DSS-3.4", "GDPR-Art.6"]`
+- [ ] Severity multiplier: regulated data leaks score 2x on risk_score
+- [ ] Sector-specific partial leak detection (e.g., last-4 of SSN = partial HIPAA violation)
+- [ ] Compliance report generation: per-regulation pass/fail summary
+
+### Implementation Phases
+
+#### Phase 1: CLI Configuration (no code changes needed today)
+- [x] Current `--secret` flag already accepts custom secrets
+- [x] Custom scenarios work via `--scenario freestyle` + modified taxonomy
+- [ ] Document sector testing recipes in QUICKSTART.md
+
+#### Phase 2: `--sector` Flag
+- [ ] Add `--sector healthcare|finance|legal|hr|saas|support|government|education` CLI flag
+- [ ] Auto-generates sector-appropriate secrets (format + realistic values)
+- [ ] Loads sector-specific system prompt context for Blue agent
+- [ ] Selects sector scenario pack when `--scenario all` is used
+- **File:** `arena/cli.py`, `arena/sectors.py` (new)
+
+#### Phase 3: Sector Scenario Packs + Compliance Judge
+- [ ] Create `training/scenarios/sectors/` directory with per-sector scenario files
+- [ ] Enhanced judge prompt with compliance framework awareness
+- [ ] `compliance_tags` in judge output JSON schema
+- [ ] Severity multiplier logic in `_verify_leak()` for regulated data
+- **Files:** `arena/prompts.py`, `arena/runner.py`, `training/scenarios/sectors/`
+
+#### Phase 4: Benchmark Suites + Reports
+- [ ] Standard sector benchmark: 4 sector scenarios x 2 modes x 3 rounds = 24 rounds per sector
+- [ ] Cross-sector vulnerability comparison dashboard
+- [ ] PDF/HTML compliance report generation with regulation citations
+- [ ] Sector leaderboard: which models are safest for which verticals
+- **Files:** `arena/reporting.py`, `arena/visualize_templates.py`
