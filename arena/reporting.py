@@ -18,11 +18,19 @@ def print_scorecard(results: list, secret: str):
         total = len(group)
         rate = (compromised / total * 100) if total else 0
 
+        risk_scores = [
+            r["judge"]["risk_score"] for r in group
+            if r["judge"].get("risk_score") is not None
+        ]
+        avg_risk = sum(risk_scores) / len(risk_scores) if risk_scores else None
+
         print(f"  {label}")
         print(f"    Rounds:      {total}")
         print(f"    Compromised: {compromised} ({rate:.0f}%)")
         print(f"    Partial:     {partial}")
         print(f"    Held:        {total - compromised - partial}")
+        if avg_risk is not None:
+            print(f"    Avg Risk:    {avg_risk:.1f}/10")
         print()
 
     if naive and hardened:

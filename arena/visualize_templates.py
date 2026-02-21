@@ -397,10 +397,16 @@ function computeStats() {
   let riskScores = ALL_RESULTS.map(r => r.judge && r.judge.risk_score).filter(s => typeof s === "number");
   const avgRisk = riskScores.length > 0 ? (riskScores.reduce((a,b) => a+b, 0) / riskScores.length).toFixed(1) : "--";
 
+  const nRiskScores = naiveResults.map(r => r.judge && r.judge.risk_score).filter(s => typeof s === "number");
+  const nAvgRisk = nRiskScores.length > 0 ? (nRiskScores.reduce((a,b) => a+b, 0) / nRiskScores.length).toFixed(1) : "--";
+
+  const hRiskScores = hardenedResults.map(r => r.judge && r.judge.risk_score).filter(s => typeof s === "number");
+  const hAvgRisk = hRiskScores.length > 0 ? (hRiskScores.reduce((a,b) => a+b, 0) / hRiskScores.length).toFixed(1) : "--";
+
   let turnsArr = ALL_RESULTS.map(r => r.judge && r.judge.turns_to_compromise).filter(t => typeof t === "number");
   const avgTurns = turnsArr.length > 0 ? (turnsArr.reduce((a,b) => a+b, 0) / turnsArr.length).toFixed(1) : "--";
 
-  return { nLeaked, hLeaked, nTotal, hTotal, nRate, hRate, delta, avgRisk, avgTurns, totalScenarios: scenarioNames.length };
+  return { nLeaked, hLeaked, nTotal, hTotal, nRate, hRate, delta, avgRisk, nAvgRisk, hAvgRisk, avgTurns, totalScenarios: scenarioNames.length };
 }
 
 // === STATE ===
@@ -720,7 +726,7 @@ function renderDashboard() {
   }
 
   // Stat cards
-  html += `<div class="dash-stats">
+  html += `<div class="dash-stats" style="grid-template-columns:repeat(5,1fr)">
     <div class="stat-card">
       <div class="stat-card-label">SCENARIOS</div>
       <div class="stat-card-value neutral" id="stat-scenarios">0</div>
@@ -728,6 +734,14 @@ function renderDashboard() {
     <div class="stat-card">
       <div class="stat-card-label">AVG RISK</div>
       <div class="stat-card-value highlight" id="stat-risk">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">NAIVE RISK</div>
+      <div class="stat-card-value" id="stat-nrisk" style="color:var(--red-soft)">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">HARDENED RISK</div>
+      <div class="stat-card-value" id="stat-hrisk" style="color:var(--green)">0</div>
     </div>
     <div class="stat-card">
       <div class="stat-card-label">AVG TURNS</div>
@@ -766,6 +780,8 @@ function renderDashboard() {
       animateCounter("delta-value", 0, stats.delta, "+", "%");
       animateCounter("stat-scenarios", 0, stats.totalScenarios, "", "");
       animateCounter("stat-risk", 0, parseFloat(stats.avgRisk) || 0, "", "", 1);
+      animateCounter("stat-nrisk", 0, parseFloat(stats.nAvgRisk) || 0, "", "", 1);
+      animateCounter("stat-hrisk", 0, parseFloat(stats.hAvgRisk) || 0, "", "", 1);
       animateCounter("stat-turns", 0, parseFloat(stats.avgTurns) || 0, "", "", 1);
     }, 100);
   });
@@ -909,6 +925,10 @@ function buildVerdictHtml(data) {
       <div class="verdict-cell"><div class="verdict-cell-label">Partial Leak</div><div class="verdict-cell-value">${j.partial_leak ? 'YES' : 'NO'}</div></div>
     </div>
     <div class="verdict-analysis">"${j.analysis||'No analysis available.'}"</div>
+    ${j.scan_results && j.scan_results.locations && j.scan_results.locations.length > 0 ? `<div class="verdict-analysis" style="margin-top:8px;font-style:normal;font-size:11px;font-family:var(--mono)">
+      <span style="color:var(--orange);font-weight:700;letter-spacing:1px">SCAN DETECTIONS:</span><br/>
+      ${j.scan_results.locations.map(l => '<span style="color:var(--red-soft)">' + l + '</span>').join('<br/>')}
+    </div>` : ''}
   </div>`;
 }
 
